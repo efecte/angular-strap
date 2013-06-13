@@ -1,6 +1,6 @@
 /**
  * AngularStrap - Twitter Bootstrap directives for AngularJS
- * @version v0.7.4 - 2013-05-26
+ * @version v0.7.4 - 2013-06-13
  * @link http://mgcrea.github.com/angular-strap
  * @author Olivier Louvignes <olivier@mg-crea.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -23,10 +23,17 @@ angular.module('$strap.directives').directive('bsAlert', [
       restrict: 'A',
       link: function postLink(scope, element, attrs) {
         var getter = $parse(attrs.bsAlert), setter = getter.assign, value = getter(scope);
+        var closeAlert = function closeAlertFn(delay) {
+          $timeout(function () {
+            element.alert('close');
+          }, delay * 1);
+        };
         if (!attrs.bsAlert) {
           if (angular.isUndefined(attrs.closeButton) || attrs.closeButton !== '0' && attrs.closeButton !== 'false') {
             element.prepend('<button type="button" class="close" data-dismiss="alert">&times;</button>');
           }
+          if (attrs.closeAfter)
+            closeAlert(attrs.closeAfter);
         } else {
           scope.$watch(attrs.bsAlert, function (newValue, oldValue) {
             value = newValue;
@@ -39,6 +46,10 @@ angular.module('$strap.directives').directive('bsAlert', [
               oldValue.type && element.removeClass('alert-' + oldValue.type);
               newValue.type && element.addClass('alert-' + newValue.type);
             }
+            if (angular.isDefined(newValue.closeAfter))
+              closeAlert(newValue.closeAfter);
+            else if (attrs.closeAfter)
+              closeAlert(attrs.closeAfter);
             if (angular.isUndefined(attrs.closeButton) || attrs.closeButton !== '0' && attrs.closeButton !== 'false') {
               element.prepend('<button type="button" class="close" data-dismiss="alert">&times;</button>');
             }
@@ -307,10 +318,25 @@ angular.module('$strap.directives').directive('bsDatepicker', [
               controller.$setValidity('date', true);
               return viewValue;
             } else if (angular.isString(viewValue) && dateFormatRegexp.test(viewValue)) {
+              var viewDate = $.fn.datepicker.DPGlobal.parseDate(viewValue, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+              if (options.startDate) {
+                var startDate = $.fn.datepicker.DPGlobal.parseDate(options.startDate, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+                if (viewDate < startDate) {
+                  controller.$setValidity('date', false);
+                  return undefined;
+                }
+              }
+              if (options.endDate) {
+                var endDate = $.fn.datepicker.DPGlobal.parseDate(options.endDate, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+                if (viewDate > endDate) {
+                  controller.$setValidity('date', false);
+                  return undefined;
+                }
+              }
               controller.$setValidity('date', true);
               if (isAppleTouch)
                 return new Date(viewValue);
-              return type === 'string' ? viewValue : $.fn.datepicker.DPGlobal.parseDate(viewValue, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+              return type === 'string' ? viewValue : viewDate;
             } else {
               controller.$setValidity('date', false);
               return undefined;
@@ -341,6 +367,24 @@ angular.module('$strap.directives').directive('bsDatepicker', [
             format: format,
             language: language
           }));
+          if (attrs.startDate) {
+            scope.$watch(attrs.startDate, function (newStartDate) {
+              options.startDate = newStartDate;
+              var datepicker = element.data('datepicker');
+              if (datepicker) {
+                datepicker.setStartDate(newStartDate);
+              }
+            });
+          }
+          if (attrs.endDate) {
+            scope.$watch(attrs.endDate, function (newEndDate) {
+              options.endDate = newEndDate;
+              var datepicker = element.data('datepicker');
+              if (datepicker) {
+                datepicker.setEndDate(newEndDate);
+              }
+            });
+          }
           scope.$on('$destroy', function () {
             var datepicker = element.data('datepicker');
             if (datepicker) {
@@ -355,6 +399,9 @@ angular.module('$strap.directives').directive('bsDatepicker', [
             element.trigger('focus');
           });
         }
+        element.on('focus', function () {
+          this.focus();
+        });
       }
     };
   }
@@ -699,7 +746,8 @@ angular.module('$strap.directives').directive('bsTabs', [
 'use strict';
 angular.module('$strap.directives').directive('bsTimepicker', [
   '$timeout',
-  function ($timeout) {
+  '$strapConfig',
+  function ($timeout, $strapConfig) {
     var TIME_REGEXP = '((?:(?:[0-1][0-9])|(?:[2][0-3])|(?:[0-9])):(?:[0-5][0-9])(?::[0-5][0-9])?(?:\\s?(?:am|AM|pm|PM))?)';
     return {
       restrict: 'A',
@@ -724,7 +772,7 @@ angular.module('$strap.directives').directive('bsTimepicker', [
         }
         element.attr('data-toggle', 'timepicker');
         element.parent().addClass('bootstrap-timepicker');
-        element.timepicker();
+        element.timepicker($strapConfig.timepicker || {});
         var timepicker = element.data('timepicker');
         var component = element.siblings('[data-toggle="timepicker"]');
         if (component.length) {

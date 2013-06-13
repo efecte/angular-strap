@@ -79,9 +79,24 @@ angular.module('$strap.directives')
             controller.$setValidity('date', true);
             return viewValue;
           } else if(angular.isString(viewValue) && dateFormatRegexp.test(viewValue)) {
+            var viewDate = $.fn.datepicker.DPGlobal.parseDate(viewValue, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+            if(options.startDate) {
+              var startDate = $.fn.datepicker.DPGlobal.parseDate(options.startDate, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+              if (viewDate < startDate) {
+                controller.$setValidity('date', false);
+                return undefined;
+              }
+            }
+            if(options.endDate) {
+              var endDate = $.fn.datepicker.DPGlobal.parseDate(options.endDate, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+              if (viewDate > endDate) {
+                controller.$setValidity('date', false);
+                return undefined;
+              }
+            }
             controller.$setValidity('date', true);
             if(isAppleTouch) return new Date(viewValue);
-            return type === 'string' ? viewValue : $.fn.datepicker.DPGlobal.parseDate(viewValue, $.fn.datepicker.DPGlobal.parseFormat(format), language);
+            return type === 'string' ? viewValue : viewDate;
           } else {
             controller.$setValidity('date', false);
             return undefined;
@@ -124,6 +139,25 @@ angular.module('$strap.directives')
           language: language
         }));
 
+        if (attrs.startDate) {
+          scope.$watch(attrs.startDate, function (newStartDate) {
+            options.startDate = newStartDate;
+            var datepicker = element.data('datepicker');
+            if (datepicker) {
+              datepicker.setStartDate(newStartDate);
+            }
+          });
+        }
+        if (attrs.endDate) {
+          scope.$watch(attrs.endDate, function (newEndDate) {
+            options.endDate = newEndDate;
+            var datepicker = element.data('datepicker');
+            if (datepicker) {
+              datepicker.setEndDate(newEndDate);
+            }
+          });
+        }
+
         // Garbage collection
         scope.$on('$destroy', function() {
           var datepicker = element.data('datepicker');
@@ -142,6 +176,10 @@ angular.module('$strap.directives')
           element.trigger('focus');
         });
       }
+
+      element.on('focus', function() {
+        this.focus(); // without this focus on input is not set (why?)
+      });
 
     }
 
